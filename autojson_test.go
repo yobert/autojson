@@ -2,6 +2,7 @@ package autojson
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -29,21 +30,40 @@ func (s Service) M3() (bool, error) {
 func (s Service) M4(v bool) (bool, error) {
 	return v, nil
 }
+func (s Service) E1() error {
+	return errors.New("hi1")
+}
+func (s Service) E2() (error, int) {
+	return errors.New("hi2"), 666
+}
+func (s Service) Empty() {
+}
+func (s Service) CodeOnly() int {
+	return 666
+}
+func (s Service) CodeWithResp() (int, int) {
+	return 666, 1234
+}
 
 func TestNewHandler(t *testing.T) {
 
 	type handlertest struct {
-		Endpoint      string
 		ServiceMethod string
 		RequestBody   string
 		Expect        string
+		ExpectCode    int
 	}
 	tests := []handlertest{
-		handlertest{"/m1", "M1", "", "\"Hi\"\n"},
-		handlertest{"/m2", "M2", "\"sup\"", "{\"hello\":\"sup\"}\n"},
-		handlertest{"/m3", "M3", "", "true\n"},
-		handlertest{"/m4a", "M4", "true", "true\n"},
-		handlertest{"/m4b", "M4", "false", "false\n"},
+		handlertest{"M1", "", "\"Hi\"\n", 200},
+		handlertest{"M2", "\"sup\"", "{\"hello\":\"sup\"}\n", 200},
+		handlertest{"M3", "", "true\n", 200},
+		handlertest{"M4", "true", "true\n", 200},
+		handlertest{"M4", "false", "false\n", 200},
+		handlertest{"E1", "", "hi1\n", 500},
+		handlertest{"E2", "", "hi2\n", 666},
+		handlertest{"Empty", "", "", 204},
+		handlertest{"CodeOnly", "", "", 666},
+		handlertest{"CodeWithResp", "", "1234\n", 666},
 	}
 
 	var (
@@ -51,8 +71,8 @@ func TestNewHandler(t *testing.T) {
 		service Service
 	)
 
-	for _, tt := range tests {
-		mux.HandleFunc(tt.Endpoint, NewHandler(service, tt.ServiceMethod))
+	for i, tt := range tests {
+		mux.HandleFunc(fmt.Sprintf("/test/%d/", i), NewHandler(service, tt.ServiceMethod))
 	}
 
 	server := http.Server{
@@ -71,7 +91,9 @@ func TestNewHandler(t *testing.T) {
 	client := http.Client{}
 
 	for tti, tt := range tests {
-		t.Run(fmt.Sprintf("NewEndpoint test %d (%#v, %#v)", tti, tt.Endpoint, tt.ServiceMethod), func(t *testing.T) {
+		endpoint := fmt.Sprintf("/test/%d/", tti)
+
+		t.Run(fmt.Sprintf("NewEndpoint test %d: %s()", tti, tt.ServiceMethod), func(t *testing.T) {
 
 			var (
 				resp *http.Response
@@ -79,9 +101,9 @@ func TestNewHandler(t *testing.T) {
 			)
 
 			if tt.RequestBody != "" {
-				resp, err = client.Post("http://"+server.Addr+tt.Endpoint, "application/json", bytes.NewBufferString(tt.RequestBody))
+				resp, err = client.Post("http://"+server.Addr+endpoint, "application/json", bytes.NewBufferString(tt.RequestBody))
 			} else {
-				resp, err = client.Get("http://" + server.Addr + tt.Endpoint)
+				resp, err = client.Get("http://" + server.Addr + endpoint)
 			}
 			if err != nil {
 				t.Error(err)
@@ -94,9 +116,12 @@ func TestNewHandler(t *testing.T) {
 				return
 			}
 
+			if resp.StatusCode != tt.ExpectCode {
+				t.Errorf("Expected HTTP %d, got %d", tt.ExpectCode, resp.StatusCode)
+			}
+
 			if string(rv) != tt.Expect {
 				t.Errorf("Expected %#v, got %#v", tt.Expect, string(rv))
-				return
 			}
 		})
 	}
