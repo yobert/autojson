@@ -33,8 +33,8 @@ func (s Service) M4(v bool) (bool, error) {
 func (s Service) E1() error {
 	return errors.New("hi1")
 }
-func (s Service) E2() (error, int) {
-	return errors.New("hi2"), 666
+func (s Service) E2() (int, error) {
+	return 666, errors.New("hi2")
 }
 func (s Service) Empty() {
 }

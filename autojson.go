@@ -9,47 +9,39 @@ import (
 	"reflect"
 )
 
-var (
-	type_error    = reflect.TypeOf((*error)(nil)).Elem()
-	type_context  = reflect.TypeOf((*context.Context)(nil)).Elem()
-	type_int      = reflect.TypeOf(666)
-	type_http_res = reflect.TypeOf((*http.ResponseWriter)(nil)).Elem()
-	type_http_req = reflect.TypeOf(http.Request{})
-)
-
-type in_idx struct {
-	ctx      int
-	req      int
-	http_req int
-	http_res int
+type argsIndex struct {
+	ctx     int
+	req     int
+	httpReq int
+	httpRes int
 }
 
-type out_idx struct {
+type returnsIndex struct {
 	res  int
 	err  int
 	code int
 }
 
-func reflect_in(f reflect.Type) (in_idx, error) {
-	r := in_idx{
-		ctx:      -1,
-		req:      -1,
-		http_req: -1,
-		http_res: -1,
+func reflectArgs(f reflect.Type) (argsIndex, error) {
+	r := argsIndex{
+		ctx:     -1,
+		req:     -1,
+		httpReq: -1,
+		httpRes: -1,
 	}
 	for i := 1; i < f.NumIn(); i++ {
 		in := f.In(i)
 
-		if r.ctx == -1 && in == type_context {
+		if r.ctx == -1 && in == reflect.TypeOf((*context.Context)(nil)).Elem() {
 			r.ctx = i
 			continue
 		}
-		if r.http_req == -1 && in == type_http_req {
-			r.http_req = i
+		if r.httpReq == -1 && in == reflect.TypeOf((*http.ResponseWriter)(nil)).Elem() {
+			r.httpReq = i
 			continue
 		}
-		if r.http_res == -1 && in == type_http_res {
-			r.http_res = i
+		if r.httpRes == -1 && in == reflect.TypeOf(http.Request{}) {
+			r.httpRes = i
 			continue
 		}
 		// assume any leftover argment is a request
@@ -61,8 +53,8 @@ func reflect_in(f reflect.Type) (in_idx, error) {
 	}
 	return r, nil
 }
-func reflect_out(f reflect.Type) (out_idx, error) {
-	r := out_idx{
+func reflectReturns(f reflect.Type) (returnsIndex, error) {
+	r := returnsIndex{
 		res:  -1,
 		err:  -1,
 		code: -1,
@@ -70,11 +62,11 @@ func reflect_out(f reflect.Type) (out_idx, error) {
 	for i := 0; i < f.NumOut(); i++ {
 		out := f.Out(i)
 
-		if r.err == -1 && out == type_error {
+		if r.err == -1 && out == reflect.TypeOf((*error)(nil)).Elem() {
 			r.err = i
 			continue
 		}
-		if r.code == -1 && out == type_int {
+		if r.code == -1 && out == reflect.TypeOf(666) {
 			r.code = i
 			continue
 		}
@@ -87,104 +79,105 @@ func reflect_out(f reflect.Type) (out_idx, error) {
 	return r, nil
 }
 
-func NewHandler(service_i interface{}, method_name string) http.HandlerFunc {
-	service_v := reflect.ValueOf(service_i)
-	service_t := service_v.Type()
+// NewHandler uses reflection to generate an http.HandlerFunc from a service and method name
+func NewHandler(service interface{}, methodName string) http.HandlerFunc {
+	serviceVal := reflect.ValueOf(service)
+	serviceType := serviceVal.Type()
 
-	method, ok := service_t.MethodByName(method_name)
+	method, ok := serviceType.MethodByName(methodName)
 	if !ok {
-		panic(fmt.Errorf("NewHandler(%s, %#v) type %s has no method %#v", service_t.String(), method_name, service_t.String(), method_name))
+		panic(fmt.Errorf("NewHandler(%s, %#v) type %s has no method %#v", serviceType.String(), methodName, serviceType.String(), methodName))
 	}
 
-	method_fv := method.Func
-	method_ft := method.Type
+	methodFunc := method.Func
+	methodType := method.Type
 
-	in, err := reflect_in(method_ft)
+	in, err := reflectArgs(methodType)
 	if err != nil {
-		panic(fmt.Errorf("NewHandler(%s, %#v) %v", service_t.String(), method_name, err))
+		panic(fmt.Errorf("NewHandler(%s, %#v) %v", serviceType.String(), methodName, err))
 	}
-	out, err := reflect_out(method_ft)
+	out, err := reflectReturns(methodType)
 	if err != nil {
-		panic(fmt.Errorf("NewHandler(%s, %#v) %v", service_t.String(), method_name, err))
+		panic(fmt.Errorf("NewHandler(%s, %#v) %v", serviceType.String(), methodName, err))
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 
-		args := make([]reflect.Value, method_ft.NumIn())
-		args[0] = service_v
+		args := make([]reflect.Value, methodType.NumIn())
+		args[0] = serviceVal
 
 		if in.ctx != -1 {
 			args[in.ctx] = reflect.ValueOf(r.Context())
 		}
-		if in.http_req != -1 {
-			args[in.http_req] = reflect.ValueOf(r)
+		if in.httpReq != -1 {
+			args[in.httpReq] = reflect.ValueOf(r)
 		}
-		if in.http_res != -1 {
-			args[in.http_res] = reflect.ValueOf(w)
+		if in.httpRes != -1 {
+			args[in.httpRes] = reflect.ValueOf(w)
 		}
 		if in.req != -1 {
-			in_f := method_ft.In(in.req)
-			in_v := reflect.New(in_f)
-			in_i := in_v.Interface()
+			inType := methodType.In(in.req)
+			inValue := reflect.New(inType)
+			inInterface := inValue.Interface()
 
 			d := json.NewDecoder(r.Body)
 
-			err := d.Decode(in_i)
+			err := d.Decode(inInterface)
 
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
 
-			if in_f.Kind() == reflect.Ptr {
-				args[in.req] = in_v
+			if inType.Kind() == reflect.Ptr {
+				args[in.req] = inValue
 			} else {
-				args[in.req] = in_v.Elem()
+				args[in.req] = inValue.Elem()
 			}
 		}
 
-		res_vals := method_fv.Call(args)
+		res := methodFunc.Call(args)
 
 		var (
-			v_out_err  error
-			v_out_code int
-			v_out_res  interface{}
+			outErr  error
+			outCode int
+			outRes  interface{}
 		)
 
 		if out.code != -1 {
-			v_out_code, _ = res_vals[out.code].Interface().(int)
+			outCode, _ = res[out.code].Interface().(int)
 		}
 		if out.err != -1 {
-			v_out_err, _ = res_vals[out.err].Interface().(error)
+			outErr, _ = res[out.err].Interface().(error)
 		}
 		if out.res != -1 {
-			v_out_res = res_vals[out.res].Interface()
+			outRes = res[out.res].Interface()
 		}
 
 		// if you set http return code -1, that means
 		// don't return a response. use this if you want
 		// to completely skip JSON encoding, upgrade a websocket,
 		// etc.
-		if v_out_code == -1 {
+		if outCode == -1 {
 			return
 		}
 
 		// if you don't specify a http code, default to 500 or 200
-		if v_out_code == 0 {
-			if v_out_err == nil {
+		if outCode == 0 {
+			if outErr == nil {
 				if out.res == -1 {
-					v_out_code = 204
+					outCode = 204
 				} else {
-					v_out_code = 200
+					outCode = 200
 				}
 			} else {
-				v_out_code = 500
+				outCode = 500
 			}
 		}
 
-		if v_out_err != nil {
-			http.Error(w, v_out_err.Error(), v_out_code)
+		if outErr != nil {
+			http.Error(w, outErr.Error(), outCode)
 			return
 		}
 
@@ -192,15 +185,15 @@ func NewHandler(service_i interface{}, method_name string) http.HandlerFunc {
 		// (as opposed to "null", if you return nil).  in this case, don't return
 		// a content type.
 		if out.res == -1 {
-			w.WriteHeader(v_out_code)
+			w.WriteHeader(outCode)
 			return
 		}
 
 		// return a JSON encoded response
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(v_out_code)
+		w.WriteHeader(outCode)
 
-		if err := json.NewEncoder(w).Encode(v_out_res); err != nil {
+		if err := json.NewEncoder(w).Encode(outRes); err != nil {
 			log.Printf("JSON encode error: %v: Cannot send response back to client\n", err)
 			return
 		}
