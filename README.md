@@ -22,29 +22,29 @@ If you return any other value, it will be marshalled by encoding/json and return
 Examples
 --------
 
-type service int
+    type service int
 
-func (_ service) Simple() string {
-	// This will return an HTTP 200 with a JSON encoded string "Hi there"
-	return "Hi there"
-}
+    func (_ service) Simple() string {
+        // This will return an HTTP 200 with a JSON encoded string "Hi there"
+        return "Hi there"
+    }
 
-func (_ service) SimpleWithStatus() (string, int) {
-	// Same but for HTTP 201
-	return "greeeeetings", 201
-}
+    func (_ service) SimpleWithStatus() (string, int) {
+        // Same but for HTTP 201
+        return "greeeeetings", 201
+    }
 
-func (_ service) IntegerWithStatus() (int, int) {
-	// The first integer will be the HTTP code.
-	// So this will return an HTTP 418 I'm a teapot with a JSON encoded number 666
-	return 418, 666
-}
+    func (_ service) IntegerWithStatus() (int, int) {
+        // The first integer will be the HTTP code.
+        // So this will return an HTTP 418 I'm a teapot with a JSON encoded number 666
+        return 418, 666
+    }
 
-type Resp struct {
-	// A more complex JSON data structure
-	Things []string
-}
-func (_ service) CustomHeader(w http.ResponseWriter) Resp {
-	w.Header().Set("X-Stuff", "fruits")
-	return Resp{Things: []string{"apple", "banana", "cherry"}}
-}
+    type Resp struct {
+        // A more complex JSON data structure
+        Things []string
+    }
+    func (_ service) CustomHeader(w http.ResponseWriter) Resp {
+        w.Header().Set("X-Stuff", "fruits")
+        return Resp{Things: []string{"apple", "banana", "cherry"}}
+    }
