@@ -89,23 +89,24 @@ func NewHandler(service interface{}, methodName string) http.HandlerFunc {
 		panic(fmt.Errorf("NewHandler(%s, %#v) type %s has no method %#v", serviceType.String(), methodName, serviceType.String(), methodName))
 	}
 
-	methodFunc := method.Func
-	methodType := method.Type
-
-	in, err := reflectArgs(methodType)
+	in, err := reflectArgs(method.Type)
 	if err != nil {
 		panic(fmt.Errorf("NewHandler(%s, %#v) %v", serviceType.String(), methodName, err))
 	}
-	out, err := reflectReturns(methodType)
+	out, err := reflectReturns(method.Type)
 	if err != nil {
 		panic(fmt.Errorf("NewHandler(%s, %#v) %v", serviceType.String(), methodName, err))
 	}
 
+	return buildHandler(in, out, serviceVal, method)
+}
+
+func buildHandler(in argsIndex, out returnsIndex, service reflect.Value, method reflect.Method) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 
-		args := make([]reflect.Value, methodType.NumIn())
-		args[0] = serviceVal
+		args := make([]reflect.Value, method.Type.NumIn())
+		args[0] = service
 
 		if in.ctx != -1 {
 			args[in.ctx] = reflect.ValueOf(r.Context())
@@ -117,7 +118,7 @@ func NewHandler(service interface{}, methodName string) http.HandlerFunc {
 			args[in.httpRes] = reflect.ValueOf(w)
 		}
 		if in.req != -1 {
-			inType := methodType.In(in.req)
+			inType := method.Type.In(in.req)
 			inValue := reflect.New(inType)
 			inInterface := inValue.Interface()
 
@@ -137,7 +138,7 @@ func NewHandler(service interface{}, methodName string) http.HandlerFunc {
 			}
 		}
 
-		res := methodFunc.Call(args)
+		res := method.Func.Call(args)
 
 		var (
 			outErr  error
