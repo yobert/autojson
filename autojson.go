@@ -36,11 +36,11 @@ func reflectArgs(f reflect.Type) (argsIndex, error) {
 			r.ctx = i
 			continue
 		}
-		if r.httpReq == -1 && in == reflect.TypeOf((*http.ResponseWriter)(nil)).Elem() {
+		if r.httpReq == -1 && in == reflect.TypeOf(&http.Request{}) {
 			r.httpReq = i
 			continue
 		}
-		if r.httpRes == -1 && in == reflect.TypeOf(http.Request{}) {
+		if r.httpRes == -1 && in == reflect.TypeOf((*http.ResponseWriter)(nil)).Elem() {
 			r.httpRes = i
 			continue
 		}
