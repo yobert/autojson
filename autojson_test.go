@@ -54,16 +54,16 @@ func TestNewHandler(t *testing.T) {
 		ExpectCode    int
 	}
 	tests := []handlertest{
-		handlertest{"M1", "", "\"Hi\"\n", 200},
-		handlertest{"M2", "\"sup\"", "{\"hello\":\"sup\"}\n", 200},
-		handlertest{"M3", "", "true\n", 200},
-		handlertest{"M4", "true", "true\n", 200},
-		handlertest{"M4", "false", "false\n", 200},
-		handlertest{"E1", "", "hi1\n", 500},
-		handlertest{"E2", "", "hi2\n", 666},
-		handlertest{"Empty", "", "", 204},
-		handlertest{"CodeOnly", "", "", 666},
-		handlertest{"CodeWithResp", "", "1234\n", 666},
+		{"M1", "", "\"Hi\"\n", 200},
+		{"M2", "\"sup\"", "{\"hello\":\"sup\"}\n", 200},
+		{"M3", "", "true\n", 200},
+		{"M4", "true", "true\n", 200},
+		{"M4", "false", "false\n", 200},
+		{"E1", "", "hi1\n", 500},
+		{"E2", "", "hi2\n", 666},
+		{"Empty", "", "", 204},
+		{"CodeOnly", "", "", 666},
+		{"CodeWithResp", "", "1234\n", 666},
 	}
 
 	var (
