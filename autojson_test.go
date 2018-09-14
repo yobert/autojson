@@ -210,6 +210,7 @@ func TestNewHandlerPanics(t *testing.T) {
 	tests := []handlertest{
 		{"TooManyArguments", "Too many arguments"},
 		{"TooManyValues", "Too many return values"},
+		{"Lard", "has no method \"Lard\""},
 	}
 
 	for tti, tt := range tests {
