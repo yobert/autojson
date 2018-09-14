@@ -1,5 +1,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/yobert/autojson)](https://goreportcard.com/report/github.com/yobert/autojson)
 [![Godoc](https://godoc.org/github.com/yobert/autojson?status.svg)](http://godoc.org/github.com/yobert/autojson)
+[![Coverage](http://gocover.io/_badge/github.com/yobert/autojson)](https://gocover.io/github.com/yobert/autojson)
+
 
 This library will generate an HTTP HandlerFunc that takes JSON as input, and returns JSON as output.
 Pass it an object, and a method name of that object as a string. You can have various combinations of
