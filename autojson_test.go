@@ -18,42 +18,42 @@ type M2Resp struct {
 	Hello string `json:"hello"`
 }
 
-func (_ Service) M1() (string, error) {
+func (Service) M1() (string, error) {
 	return "Hi", nil
 }
-func (_ Service) M2(hi string) (M2Resp, error) {
+func (Service) M2(hi string) (M2Resp, error) {
 	return M2Resp{
 		Hello: hi,
 	}, nil
 }
-func (_ Service) M3() (bool, error) {
+func (Service) M3() (bool, error) {
 	return true, nil
 }
-func (_ Service) M4(v bool) (bool, error) {
+func (Service) M4(v bool) (bool, error) {
 	return v, nil
 }
-func (_ Service) E1() error {
+func (Service) E1() error {
 	return errors.New("hi1")
 }
-func (_ Service) E2() (int, error) {
+func (Service) E2() (int, error) {
 	return 666, errors.New("hi2")
 }
-func (_ Service) Numbers(n int) (int, int) {
+func (Service) Numbers(n int) (int, int) {
 	return 200, n
 }
-func (_ Service) Empty() {
+func (Service) Empty() {
 }
-func (_ Service) CodeOnly() int {
+func (Service) CodeOnly() int {
 	return 666
 }
-func (_ Service) CodeWithResp() (int, int) {
+func (Service) CodeWithResp() (int, int) {
 	return 666, 1234
 }
-func (_ Service) HeaderTest(w http.ResponseWriter) string {
+func (Service) HeaderTest(w http.ResponseWriter) string {
 	w.Header().Set(testHeaderName, "coolio")
 	return "wasaaap"
 }
-func (_ Service) CustomResponse(w http.ResponseWriter, r *http.Request) int {
+func (Service) CustomResponse(w http.ResponseWriter, r *http.Request) int {
 	// just to make sure it's populated correctly
 	_ = r.Header
 
@@ -78,11 +78,11 @@ func TestNewHandler(t *testing.T) {
 		{"M3", "", "true\n", 200, ""},
 		{"M4", "true", "true\n", 200, ""},
 		{"M4", "false", "false\n", 200, ""},
-		{"E1", "", "hi1\n", 500, ""},
-		{"E2", "", "hi2\n", 666, ""},
+		{"E1", "", "{\"error\":\"hi1\"}\n", 500, ""},
+		{"E2", "", "{\"error\":\"hi2\"}\n", 666, ""},
 		{"Numbers", "1234", "1234\n", 200, ""},
-		{"Empty", "", "", 204, ""},
-		{"CodeOnly", "", "", 666, ""},
+		{"Empty", "", "null\n", 200, ""},
+		{"CodeOnly", "", "null\n", 666, ""},
 		{"CodeWithResp", "", "1234\n", 666, ""},
 		{"HeaderTest", "", "\"wasaaap\"\n", 200, "coolio"},
 		{"CustomResponse", "", "A plain text response", 201, ""},

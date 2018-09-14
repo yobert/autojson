@@ -22,6 +22,12 @@ type returnsIndex struct {
 	code int
 }
 
+// ErrorResponse will be returned if your handler has a return value of type error,
+// with the stringified error populated.
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
 func reflectArgs(f reflect.Type) (argsIndex, error) {
 	r := argsIndex{
 		ctx:     -1,
@@ -160,6 +166,10 @@ func buildHandler(in argsIndex, out returnsIndex, service reflect.Value, method 
 		// don't return a response. use this if you want
 		// to completely skip JSON encoding, upgrade a websocket,
 		// etc.
+		//
+		// Otherwise, we will _always_ return valid JSON, with the
+		// exception of if JSON encoding fails, in which case the
+		// response will simply be truncated.
 		if outCode == -1 {
 			return
 		}
@@ -167,31 +177,19 @@ func buildHandler(in argsIndex, out returnsIndex, service reflect.Value, method 
 		// if you don't specify a http code, default to 500 or 200
 		if outCode == 0 {
 			if outErr == nil {
-				if out.res == -1 {
-					outCode = 204
-				} else {
-					outCode = 200
-				}
+				outCode = 200
 			} else {
 				outCode = 500
 			}
 		}
 
-		if outErr != nil {
-			http.Error(w, outErr.Error(), outCode)
-			return
-		}
+		w.Header().Set("Content-Type", "application/json")
 
-		// if you don't have a return value at all, return an empty response body.
-		// (as opposed to "null", if you return nil).  in this case, don't return
-		// a content type.
-		if out.res == -1 {
-			w.WriteHeader(outCode)
-			return
+		if outErr != nil {
+			outRes = &ErrorResponse{Error: outErr.Error()}
 		}
 
 		// return a JSON encoded response
-		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(outCode)
 
 		if err := json.NewEncoder(w).Encode(outRes); err != nil {
