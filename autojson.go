@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"reflect"
+	"strconv"
 )
 
 type argsIndex struct {
@@ -137,11 +138,7 @@ func buildHandler(in argsIndex, out returnsIndex, service reflect.Value, method 
 				return
 			}
 
-			if inType.Kind() == reflect.Ptr {
-				args[in.req] = inValue
-			} else {
-				args[in.req] = inValue.Elem()
-			}
+			args[in.req] = inValue.Elem()
 		}
 
 		res := method.Func.Call(args)
@@ -166,10 +163,6 @@ func buildHandler(in argsIndex, out returnsIndex, service reflect.Value, method 
 		// don't return a response. use this if you want
 		// to completely skip JSON encoding, upgrade a websocket,
 		// etc.
-		//
-		// Otherwise, we will _always_ return valid JSON, with the
-		// exception of if JSON encoding fails, in which case the
-		// response will simply be truncated.
 		if outCode == -1 {
 			return
 		}
@@ -183,17 +176,48 @@ func buildHandler(in argsIndex, out returnsIndex, service reflect.Value, method 
 			}
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-
 		if outErr != nil {
 			outRes = &ErrorResponse{Error: outErr.Error()}
 		}
 
-		// return a JSON encoded response
+		// If your handler returns something that cannot be marshalled
+		// to valid JSON, we're going to return an error and override
+		// any requested status code to 500.
+		//
+		// Pros of encoding JSON to a buffer first:
+		// - We can send a correct Content-Length so net/http doesn't have
+		//   to do any games with our output
+		// - We can capture this type of error and give a nice reply instead
+		//   of just closing the response
+		//
+		// Cons:
+		// - A huge data structure must be buffered in memory first
+		// - An object with a special encoding method could have streamed
+		//   bytes to the client.  (Super cool, but not common at all.)
+		buf, err := json.Marshal(outRes)
+		if err != nil {
+			// We still want this error to be JSON
+			outCode = 500
+			outRes = &ErrorResponse{Error: err.Error()}
+			buf, err = json.Marshal(outRes)
+
+			if err != nil {
+				// Well, shit
+				log.Printf("Error encoding error to JSON: %v\n", err)
+				http.Error(w, err.Error(), 500)
+				return
+			}
+
+			// okay we can send the encoded error below
+		}
+
+		w.Header().Set("Content-Length", strconv.Itoa(len(buf)))
+		w.Header().Set("Content-Type", "application/json")
+
 		w.WriteHeader(outCode)
 
-		if err := json.NewEncoder(w).Encode(outRes); err != nil {
-			log.Printf("JSON encode error: %v: Cannot send response back to client\n", err)
+		if _, err := w.Write(buf); err != nil {
+			log.Printf("Write error: %v\n", err)
 			return
 		}
 
