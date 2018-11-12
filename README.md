@@ -7,6 +7,39 @@ This library will generate an HTTP HandlerFunc that takes JSON as input, and ret
 Pass it an object, and a method name of that object as a string. You can have various combinations of
 arguments and return values to control behavior, depending on the value types. All are optional.
 
+Simple Usage
+------------
+    package main
+
+    import (
+        "log"
+        "net/http"
+
+        "github.com/yobert/autojson"
+    )
+
+    type Service struct {}
+
+    func (s *Service) HiMethod() string {
+        return "Hi there, friend!"
+    }
+
+    func (s *Service) HelloMethod(name string) string {
+        return "Hello back to you, " + name
+    }
+
+    func main() {
+        s := &Service{}
+        http.HandleFunc("/hi", autojson.NewHandler(s, "HiMethod"))
+        http.HandleFunc("/hello", autojson.NewHandler(s, "HelloMethod"))
+        log.Fatal(http.ListenAndServe(":8080", nil))
+    }
+
+    // $ curl http://localhost:8080/hi
+    // "Hi there, friend!"
+    // $ curl -d '"Adrian"' http://localhost:8080/hello
+    // "Hello back to you, Adrian"
+
 Method Argument Types
 ---------------------
 An argument of type context.Context, http.ResponseWriter, http.Request will be copied from the source request.

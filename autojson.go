@@ -23,8 +23,8 @@ type returnsIndex struct {
 	code int
 }
 
-// ErrorResponse will be returned if your handler has a return value of type error,
-// with the stringified error populated.
+// ErrorResponse will be encoded as JSON and returned if your handler has a
+// return value of type error, with the stringified error populated.
 type ErrorResponse struct {
 	Error string `json:"error"`
 }
